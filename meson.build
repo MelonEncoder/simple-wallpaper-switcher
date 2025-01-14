@@ -4,5 +4,3 @@ compiler = meson.get_compiler('c')
 dep = [dependency('sfml-all')]
 
 executable('app.out', 'src/main.cpp', dependencies: dep)
-
-# run_command('./build/app.out')
