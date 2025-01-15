@@ -1,7 +1,9 @@
 # Simple Wallpaper Swaper
 This GUI tool is designed to be desktop agnostic allowing the user to choose which technology they use to swap wallpapers. Almost all desktops environments and especially window managers should have some form of cli tool for switching wallpapers with the wallpaper paths remaining constant.
+## Code Dependencies
+- [SFML](https://www.sfml-dev.org/): Simple and Fast Multimedia Library (>= v3.0.0)
 
-## Config File
+# Config File
 ```
 swps -c /path/to/config/file.conf
 ```
@@ -16,10 +18,9 @@ swps -c /path/to/config/file.conf
 | outline_thickness | Size of wallpaper thumbnail borders on hover. | float | 2.0 |
 | outline_color | Wallpaper thumbnail border color. | rgb(int, int, int) | rgb(255, 255, 0) |
 
-## Example Configs
-------
-### Hyprland
-hyprland.conf
+# Example Configs
+### [Hyprland](https://hyprland.org/)
+Launch via Hyprland configuration file: hyprland.conf
 ```
 bind = $mainMod CONTROL, S, exec, swps -c ~/.config/hypr/swps.conf
 ```
@@ -37,8 +38,8 @@ exec = [
 ]
 ```
 ------
-### Sway
-config
+### [Sway](https://swaywm.org/)
+Launch via the sway configuration file: config
 ```
 bindsym Shift+s exec swps -c ~/.config/sway/swps.conf
 ```
