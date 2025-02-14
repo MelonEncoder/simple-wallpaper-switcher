@@ -6,6 +6,7 @@
 #include <SFML/Graphics/Sprite.hpp>
 #include <SFML/System/Vector2.hpp>
 #include <SFML/Window/ContextSettings.hpp>
+#include <SFML/Window/Keyboard.hpp>
 #include <SFML/Window/Mouse.hpp>
 #include <SFML/Window/VideoMode.hpp>
 #include <SFML/Window/Window.hpp>
@@ -21,6 +22,7 @@
 #include <iostream>
 #include <filesystem>
 #include <fstream>
+#include <sys/types.h>
 
 class WallpaperButton {
     public:
@@ -57,6 +59,12 @@ class WallpaperButton {
                 exit(0);
             }
         }
+        void setPosition(sf::Vector2f pos) {
+            shape.setPosition(pos);
+        }
+        sf::Vector2f getPosition() {
+            return shape.getPosition();
+        }
         private:
             // Button properties like position, size, texture, etc.
             sf::RectangleShape shape;
@@ -69,8 +77,10 @@ class WallpaperButton {
 };
 
 // Variables
+int scroll_offset = 0;
 uint column_count = 3;
-float outline_thickness = 2;
+float outline_thickness = 2.0f;
+float scroll_speed = 0.1f;
 sf::Color outline_color(255, 255, 0);
 sf::Color background_color(0, 0, 0);
 std::string config_path = "";
@@ -137,7 +147,7 @@ int main(int argc, char* argv[]) {
     for (size_t i = 0, x = outer_gaps.x, y = outer_gaps.y; i < wp_paths.size(); i++, x += thumb_size.x + inner_gaps.x) {
         if (i % column_count == 0 && i != 0) {
             y += thumb_size.y + inner_gaps.y;
-            x = outer_gaps.x;
+            x = outer_gaps.x + scroll_offset;
         }
         sf::RectangleShape shape((sf::Vector2f) thumb_size);
         shape.setOutlineColor(outline_color);
@@ -161,6 +171,24 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        bool up_arrow = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up);
+        bool down_arrow = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down);
+        if (up_arrow) {
+            for (size_t i = 0; i < buttons.size(); i++) {
+                if (buttons[0].getPosition().y >= outer_gaps.y) {
+                    break;
+                }
+                buttons[i].setPosition({buttons[i].getPosition().x, buttons[i].getPosition().y + scroll_speed});
+            }
+        } else if (down_arrow) {
+            for (size_t i = 0; i < buttons.size(); i++) {
+                if (buttons[buttons.size() - 1].getPosition().y <= outer_gaps.y) {
+                    break;
+                }
+                buttons[i].setPosition({buttons[i].getPosition().x, buttons[i].getPosition().y - scroll_speed});
+            }
+        }
+
         window.draw(background);
 
         mouse_pos = sf::Mouse::getPosition(window);
@@ -175,6 +203,10 @@ int main(int argc, char* argv[]) {
         window.display();
     }
     return 1;
+}
+
+void draw_buttons() {
+
 }
 
 std::string trim (const std::string& str) {
@@ -257,6 +289,8 @@ void parse_config(std::string config_path) {
             char g = std::stoi(value.substr(value.find_first_of(',') + 1, value.find_last_of(',')));
             char b = std::stoi(value.substr(value.find_last_of(',') + 1, value.find(']')));
             background_color = sf::Color(r, g, b);
+        } else if (var == "scroll_speed") {
+            scroll_speed = std::stof(value) / 100.0f;
         }
     }
     config_file.close();
