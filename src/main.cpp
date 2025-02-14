@@ -72,6 +72,7 @@ class WallpaperButton {
 uint column_count = 3;
 float outline_thickness = 2;
 sf::Color outline_color(255, 255, 0);
+sf::Color background_color(0, 0, 0);
 std::string config_path = "";
 std::string wallpaper_directory = "";
 sf::Vector2u window_size = {900, 600};
@@ -80,7 +81,7 @@ sf::Vector2u outer_gaps = {25, 25};
 sf::Vector2f thumb_size;
 std::vector<std::string> wp_paths;
 std::vector<sf::Texture> wp_textures;
-std::vector<std::string> commands;
+std::vector<std::string> exec_commands;
 std::vector<WallpaperButton> buttons;
 
 std::string trim (const std::string& str);
@@ -147,6 +148,9 @@ int main(int argc, char* argv[]) {
         buttons.push_back(button);
     }
 
+    sf::RectangleShape background((sf::Vector2f)window_size);
+    background.setFillColor(background_color);
+
     // App Loop
     sf::Vector2i mouse_pos;
     while (window.isOpen()) {
@@ -156,12 +160,15 @@ int main(int argc, char* argv[]) {
                 window.close();
             }
         }
+
+        window.draw(background);
+
         mouse_pos = sf::Mouse::getPosition(window);
 
         // Draw wallpapers to screen
         for (WallpaperButton &btn : buttons) {
             btn.onHover((sf::Vector2f)mouse_pos);
-            btn.onClick(commands);
+            btn.onClick(exec_commands);
             btn.draw(window, sf::RenderStates::Default);
         }
 
@@ -207,9 +214,9 @@ void parse_config(std::string config_path) {
         } else if (var == "outline_thickness") {
             outline_thickness = std::stof(value);
         } else if (var == "outline_color") {
-            char r = std::stoi(value.substr(value.find('(') + 1, value.find_first_of(',')));
+            char r = std::stoi(value.substr(value.find('[') + 1, value.find_first_of(',')));
             char g = std::stoi(value.substr(value.find_first_of(',') + 1, value.find_last_of(',')));
-            char b = std::stoi(value.substr(value.find_last_of(',') + 1, value.find(')')));
+            char b = std::stoi(value.substr(value.find_last_of(',') + 1, value.find(']')));
             outline_color = sf::Color(r, g, b);
         } else if (var == "inner_gaps") {
             uint x;
@@ -239,12 +246,17 @@ void parse_config(std::string config_path) {
             column_count = std::stoi(value);
         } else if (var == "exec") {
             if (value[0] != '[') {
-                commands.push_back(value);
+                exec_commands.push_back(value);
             } else {
                 while (lines[++i][0] != ']') {
-                    commands.push_back(trim(lines[i]));
+                    exec_commands.push_back(trim(lines[i]));
                 }
             }
+        } else if (var == "background_color") {
+            char r = std::stoi(value.substr(value.find('[') + 1, value.find_first_of(',')));
+            char g = std::stoi(value.substr(value.find_first_of(',') + 1, value.find_last_of(',')));
+            char b = std::stoi(value.substr(value.find_last_of(',') + 1, value.find(']')));
+            background_color = sf::Color(r, g, b);
         }
     }
     config_file.close();

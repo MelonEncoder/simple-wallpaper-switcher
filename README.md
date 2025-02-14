@@ -9,14 +9,15 @@ swps -c /path/to/config/file.conf
 ```
 | VARIABLE    | DESCRIPTION | TYPE | DEFAULT |
 |---------|-------------|------|---------|
-| wallpaper_directory | The path to the wallpaper directory. | string | "" |
+| wallpaper_directory | The path to the wallpaper directory. | string | |
 | window_size | Size of the window. | int, int | 800, 600 |
-| exec | An array of commands to execute. Use {wp} to represent the wallpaper path. (put each command on new line if multiple) | string[] | "" |
+| exec | An array of commands to execute. Use {wp} to represent the wallpaper path. (put each command on new line if multiple) | string[] | [] |
 | column_count | Number of columns to display. | int | 3 |
 | inner_gaps | Gaps inbetween thumbnails. (vertical, horizontal) | int, int | 10 |
 | outer_gaps | Gaps between thumbnails and the window edge. (vertical, horizontal) | int, int | 25 |
 | outline_thickness | Size of wallpaper thumbnail borders on hover. | float | 2.0 |
-| outline_color | Wallpaper thumbnail border color. | rgb(int, int, int) | rgb(255, 255, 0) |
+| outline_color | Wallpaper thumbnail border color. | [int8, int8, int8] | [255, 255, 0] |
+| background_color | Background color of window. | [int8, int8, int8] | [0, 0, 0] |
 
 # Example Configs
 ### [Hyprland](https://hyprland.org/)
@@ -29,13 +30,14 @@ swps.conf
 wallpaper_directory = /home/usr/.config/hypr/bg/
 
 outline_thickness = 2.5
-outline_color = rgb(255, 255, 0)
+outline_color = [255, 255, 0]
 inner_gaps = 15
 column_count = 4
 exec = [
     hyprctl hyprpaper preload {wp}
     hyprctl hyprpaper wallpaper ,{wp}
 ]
+background_color = [60, 90, 0]
 ```
 ------
 ### [Sway](https://swaywm.org/)
@@ -51,6 +53,6 @@ exec = swaybg -i {wp} -m fill
 
 window_size = 700, 350
 outline_thickness = 4
-outline_color = rgb(0, 255, 255)
+outline_color = [0, 255, 255]
 outer_gaps = 15, 50
 ```
