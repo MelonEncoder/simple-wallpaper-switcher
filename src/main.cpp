@@ -76,6 +76,33 @@ class WallpaperButton {
             float outlineThickness = 0;
 };
 
+class KeyPlus {
+    sf::Keyboard::Key key;
+    bool key_pressed;
+    bool key_released;
+    bool key_down;
+    public:
+        KeyPlus(sf::Keyboard::Key key) {
+            this->key = key;
+            key_pressed = false;
+            key_released = false;
+            key_down = false;
+        }
+        bool isKeyReleased() {
+            key_pressed = sf::Keyboard::isKeyPressed(key);
+            if (key_released) {
+                key_pressed = false;
+                key_released = false;
+                key_down = false;
+            } else if (key_pressed && !key_released) {
+                key_down = true;
+            } else if (key_down && !key_pressed) {
+                key_released = true;
+            }
+            return key_released;
+        }
+};
+
 // Variables
 int scroll_offset = 0;
 uint column_count = 3;
@@ -94,6 +121,7 @@ std::vector<sf::Texture> wp_textures;
 std::vector<std::string> exec_commands;
 std::vector<WallpaperButton> buttons;
 
+bool isKeyReleased(sf::Keyboard::Key key);
 std::string trim (const std::string& str);
 void parse_config(std::string config_path);
 
@@ -161,6 +189,9 @@ int main(int argc, char* argv[]) {
     sf::RectangleShape background((sf::Vector2f)window_size);
     background.setFillColor(background_color);
 
+    KeyPlus j_key(sf::Keyboard::Key::J);
+    KeyPlus k_key(sf::Keyboard::Key::K);
+
     // App Loop
     sf::Vector2i mouse_pos;
     while (window.isOpen()) {
@@ -189,6 +220,18 @@ int main(int argc, char* argv[]) {
             }
         }
 
+        if (j_key.isKeyReleased()) {
+            std::cout << "J" << std::endl;
+        } else if (k_key.isKeyReleased()) {
+            std::cout << "K" << std::endl;
+        }
+
+
+        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Unknown)) {
+            std::cout << "unk" << std::endl;
+        }
+
+
         window.draw(background);
 
         mouse_pos = sf::Mouse::getPosition(window);
@@ -203,6 +246,15 @@ int main(int argc, char* argv[]) {
         window.display();
     }
     return 1;
+}
+
+bool isKeyReleased(sf::Keyboard::Key key) {
+    if (sf::Keyboard::isKeyPressed(key)) {
+        if (!sf::Keyboard::isKeyPressed(key)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 void draw_buttons() {
