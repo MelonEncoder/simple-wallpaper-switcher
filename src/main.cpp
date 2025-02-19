@@ -1,4 +1,3 @@
-#include <SFML/Graphics/Font.hpp>
 #include <SFML/Graphics/Rect.hpp>
 #include <SFML/Graphics/RectangleShape.hpp>
 #include <SFML/Graphics/RenderStates.hpp>
@@ -7,22 +6,16 @@
 #include <SFML/System/Vector2.hpp>
 #include <SFML/Window/ContextSettings.hpp>
 #include <SFML/Window/Keyboard.hpp>
-#include <SFML/Window/Mouse.hpp>
 #include <SFML/Window/VideoMode.hpp>
 #include <SFML/Window/Window.hpp>
 #include <SFML/Window/WindowEnums.hpp>
-#include <SFML/Graphics/Drawable.hpp>
-#include <cstddef>
-#include <cstdlib>
 #include <SFML/Main.hpp>
 #include <SFML/Graphics.hpp>
-#include <cwchar>
-#include <optional>
 #include <string>
 #include <iostream>
 #include <filesystem>
 #include <fstream>
-#include <sys/types.h>
+#include <system_error>
 
 class WPButton {
     bool isSelected = false;
@@ -316,6 +309,14 @@ std::string trim (const std::string& str) {
     return str.substr(first, last);
 }
 
+std::string getHomeDir() {
+    char * home = std::getenv("HOME");
+    if (!home) {
+        throw std::runtime_error("Failed to get home directory");
+    }
+    return std::string(home);
+}
+
 void parse_config(std::string config_path) {
     std::fstream config_file(config_path, std::ios::in);
     if (!config_file.is_open()) {
@@ -323,7 +324,6 @@ void parse_config(std::string config_path) {
         exit(1);
     }
     std::vector<std::string> lines;
-    // logic
     std::string line;
     while (std::getline(config_file, line)) {
         lines.push_back(line);
@@ -335,6 +335,14 @@ void parse_config(std::string config_path) {
         value = trim(value);
         if (var == "wallpaper_directory") {
             wallpaper_directory = value;
+            if (wallpaper_directory.find('~') == 0) {
+                try {
+                    wallpaper_directory = getHomeDir() + wallpaper_directory.substr(1);
+                } catch (std::error_code e) {
+                    std::cerr << "<!> Error: " << e << std::endl;
+                    exit(1);
+                }
+            }
             if (!std::filesystem::is_directory(wallpaper_directory)) {
                 std::cerr << "<!> wallpaper_directory variable is not valid." << std::endl;
                 exit(1);
