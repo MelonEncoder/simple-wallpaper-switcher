@@ -24,56 +24,63 @@
 #include <fstream>
 #include <sys/types.h>
 
-class WallpaperButton {
+class WPButton {
+    bool isSelected = false;
+    float outlineThickness = 0;
+    std::string path;
+    sf::RectangleShape shape;
+    sf::Vector2i gridPosition;
     public:
-        WallpaperButton(sf::RectangleShape& shape, std::string path) :
+        static inline sf::Vector2i selected = {0, 0};
+        static inline std::vector<std::string> commands;
+        WPButton(sf::RectangleShape& shape, std::string path, sf::Vector2i gridPosition) :
             shape(shape) {
                 this->path = path;
                 this->outlineThickness = shape.getOutlineThickness();
+                this->gridPosition = gridPosition;
         }
         void draw(sf::RenderTarget& target, sf::RenderStates states) {
             target.draw(shape, states);
-            // target.draw(text, states);
         }
-        void onHover(sf::Vector2f mouse_pos) {
-            if (shape.getGlobalBounds().contains(mouse_pos)) {
-                isHovered = true;
+        void onSelected() {
+            if (WPButton::selected == gridPosition) {
+                isSelected = true;
                 shape.setOutlineThickness(outlineThickness);
             } else {
-                isHovered = false;
+                isSelected = false;
                 shape.setOutlineThickness(0);
             }
         }
-        void onClick(std::vector<std::string> &commands) {
-            if (sf::Mouse::isButtonPressed(sf::Mouse::Button::Left) && isHovered) {
-                for (std::string &cmd : commands) {
-                    int wp_index = cmd.find("{wp}");
-                    cmd.erase(wp_index, 4);
-                    cmd.insert(wp_index, path);
-                    int result = std::system(cmd.c_str());
-                    if (result != 0) {
-                        std::cerr << "<!> Error running commands." << std::endl;
-                        shape.setOutlineColor(sf::Color::Red);
-                    }
-                }
-                exit(0);
+        void onEnter() {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter) && isSelected) {
+                execute();
             }
+        }
+        void execute() {
+            for (std::string &cmd : commands) {
+                int wp_index = cmd.find("{wp}");
+                cmd.erase(wp_index, 4);
+                cmd.insert(wp_index, path);
+                int result = std::system(cmd.c_str());
+                if (result != 0) {
+                    std::cerr << "<!> Error running commands." << std::endl;
+                    shape.setOutlineColor(sf::Color::Red);
+                }
+            }
+            exit(0);
         }
         void setPosition(sf::Vector2f pos) {
             shape.setPosition(pos);
         }
+        bool getIsSelected() {
+                    return isSelected;
+                }
         sf::Vector2f getPosition() {
             return shape.getPosition();
         }
-        private:
-            // Button properties like position, size, texture, etc.
-            sf::RectangleShape shape;
-            sf::Vector2f position;
-            std::string path;
-
-            // State properties
-            bool isHovered = false;
-            float outlineThickness = 0;
+        sf::Vector2i getGridPosition() {
+            return gridPosition;
+        }
 };
 
 class KeyPlus {
@@ -119,13 +126,14 @@ sf::Vector2f thumb_size;
 std::vector<std::string> wp_paths;
 std::vector<sf::Texture> wp_textures;
 std::vector<std::string> exec_commands;
-std::vector<WallpaperButton> buttons;
+std::vector<std::vector<WPButton>> buttons;
 
 bool isKeyReleased(sf::Keyboard::Key key);
 std::string trim (const std::string& str);
 void parse_config(std::string config_path);
 
 int main(int argc, char* argv[]) {
+    // CLI
     if (argc <= 1) {
         std::cout << "<!> Not enough arguments." << std::endl;
         return 1;
@@ -154,6 +162,8 @@ int main(int argc, char* argv[]) {
     }
     parse_config(config_path);
 
+    WPButton::commands = exec_commands;
+
     thumb_size.x = ((float)window_size.x - (((column_count - 1) * inner_gaps.x) + (outer_gaps.x * 2))) / column_count;
     thumb_size.y = thumb_size.x * (9.0/16.0);
 
@@ -172,28 +182,47 @@ int main(int argc, char* argv[]) {
     window.setPosition(((sf::Vector2i)sf::VideoMode::getDesktopMode().size / 2) - ((sf::Vector2i)window_size / 2));
 
     // Create Wallpaper Buttons
-    for (size_t i = 0, x = outer_gaps.x, y = outer_gaps.y; i < wp_paths.size(); i++, x += thumb_size.x + inner_gaps.x) {
-        if (i % column_count == 0 && i != 0) {
-            y += thumb_size.y + inner_gaps.y;
-            x = outer_gaps.x + scroll_offset;
+    size_t wp_index = 0;
+    size_t rows = (int)(wp_paths.size() / column_count) + (wp_paths.size() % column_count > 0 ? 1 : 0);
+    size_t x = outer_gaps.x;
+    size_t y = outer_gaps.y;
+    for (size_t row = 0; row < rows; row++) {
+        std::vector<WPButton> buttonRow = {};
+        for (size_t col = 0; col < column_count; col++) {
+            if (wp_index == wp_paths.size()) {
+                break;
+            }
+            sf::RectangleShape shape((sf::Vector2f)thumb_size);
+            shape.setOutlineColor(outline_color);
+            shape.setOutlineThickness(outline_thickness);
+            shape.setPosition({(float)x, (float)y});
+            shape.setTexture(&wp_textures[wp_index]);
+            WPButton button(shape, wp_paths[wp_index], {(int)col, (int)row});
+            buttonRow.push_back(button);
+            x += thumb_size.x + inner_gaps.x;
+            wp_index++;
         }
-        sf::RectangleShape shape((sf::Vector2f) thumb_size);
-        shape.setOutlineColor(outline_color);
-        shape.setOutlineThickness(outline_thickness);
-        shape.setTexture(&wp_textures[i]);
-        shape.setPosition({(float)x, (float)y});
-        WallpaperButton button(shape, wp_paths[i]);
-        buttons.push_back(button);
+        y += thumb_size.y + inner_gaps.y;
+        x = outer_gaps.x + scroll_offset;
+        buttons.push_back(buttonRow);
     }
 
+    // Background
     sf::RectangleShape background((sf::Vector2f)window_size);
     background.setFillColor(background_color);
 
-    KeyPlus j_key(sf::Keyboard::Key::J);
+    // Move keys
     KeyPlus k_key(sf::Keyboard::Key::K);
+    KeyPlus j_key(sf::Keyboard::Key::J);
+    KeyPlus h_key(sf::Keyboard::Key::H);
+    KeyPlus l_key(sf::Keyboard::Key::L);
+
+    KeyPlus up_key(sf::Keyboard::Key::Up);
+    KeyPlus down_key(sf::Keyboard::Key::Down);
+    KeyPlus left_key(sf::Keyboard::Key::Left);
+    KeyPlus right_key(sf::Keyboard::Key::Right);
 
     // App Loop
-    sf::Vector2i mouse_pos;
     while (window.isOpen()) {
         window.clear();
         while (const std::optional event = window.pollEvent()) {
@@ -202,45 +231,62 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        bool up_arrow = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Up);
-        bool down_arrow = sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Down);
-        if (up_arrow) {
-            for (size_t i = 0; i < buttons.size(); i++) {
-                if (buttons[0].getPosition().y >= outer_gaps.y) {
-                    break;
-                }
-                buttons[i].setPosition({buttons[i].getPosition().x, buttons[i].getPosition().y + scroll_speed});
+        // Move via VIM or Arrow keys
+        if (k_key.isKeyReleased() || up_key.isKeyReleased()) {
+            if (WPButton::selected.y > 0) {
+                WPButton::selected.y -= 1;
             }
-        } else if (down_arrow) {
-            for (size_t i = 0; i < buttons.size(); i++) {
-                if (buttons[buttons.size() - 1].getPosition().y <= outer_gaps.y) {
-                    break;
+        } else if (j_key.isKeyReleased() || down_key.isKeyReleased()) {
+            if (WPButton::selected.y < (int)buttons.size() - 1) {
+                if (WPButton::selected.x < (int)buttons[WPButton::selected.y + 1].size()) {
+                    WPButton::selected.y += 1;
                 }
-                buttons[i].setPosition({buttons[i].getPosition().x, buttons[i].getPosition().y - scroll_speed});
+            }
+        } else if (h_key.isKeyReleased() || left_key.isKeyReleased()) {
+            if (WPButton::selected.x > 0) {
+                WPButton::selected.x -= 1;
+            }
+        } else if (l_key.isKeyReleased() || right_key.isKeyReleased()) {
+            if (WPButton::selected.x < (int)buttons[0].size() - 1) {
+                if (WPButton::selected.x < (int)buttons[WPButton::selected.y].size() - 1) {
+                    WPButton::selected.x += 1;
+                }
             }
         }
 
-        if (j_key.isKeyReleased()) {
-            std::cout << "J" << std::endl;
-        } else if (k_key.isKeyReleased()) {
-            std::cout << "K" << std::endl;
+        // Scroll Functionality
+        WPButton tmpBtn = buttons[WPButton::selected.y][WPButton::selected.x];
+        if (tmpBtn.getPosition().y + thumb_size.y > window_size.y) {
+            for (size_t row = 0; row < buttons.size(); row++) {
+                for (size_t col = 0; col < buttons[0].size(); col++) {
+                    if (col == buttons[row].size()) {
+                        break;
+                    }
+                    sf::Vector2f pos = buttons[row][col].getPosition();
+                    buttons[row][col].setPosition({pos.x, pos.y - thumb_size.y});
+                }
+            }
+        } else if (tmpBtn.getPosition().y < 0) {
+            for (size_t row = 0; row < buttons.size(); row++) {
+                for (size_t col = 0; col < buttons[0].size(); col++) {
+                    if (col == buttons[row].size()) {
+                        break;
+                    }
+                    sf::Vector2f pos = buttons[row][col].getPosition();
+                    buttons[row][col].setPosition({pos.x, pos.y + thumb_size.y});
+                }
+            }
         }
-
-
-        if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Unknown)) {
-            std::cout << "unk" << std::endl;
-        }
-
 
         window.draw(background);
 
-        mouse_pos = sf::Mouse::getPosition(window);
-
         // Draw wallpapers to screen
-        for (WallpaperButton &btn : buttons) {
-            btn.onHover((sf::Vector2f)mouse_pos);
-            btn.onClick(exec_commands);
-            btn.draw(window, sf::RenderStates::Default);
+        for (auto rows : buttons) {
+            for (auto btn : rows) {
+                btn.onSelected();
+                btn.draw(window, sf::RenderStates::Default);
+                btn.onEnter();
+            }
         }
 
         window.display();
@@ -255,10 +301,6 @@ bool isKeyReleased(sf::Keyboard::Key key) {
         }
     }
     return false;
-}
-
-void draw_buttons() {
-
 }
 
 std::string trim (const std::string& str) {

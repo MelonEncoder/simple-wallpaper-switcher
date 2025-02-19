@@ -1,9 +1,18 @@
 # Simple Wallpaper Swaper
-This GUI tool is designed to be desktop agnostic allowing the user to choose which technology they use to swap wallpapers. Almost all desktops environments and especially window managers should have some form of cli tool for switching wallpapers with the wallpaper paths remaining constant.
-## Code Dependencies
-- [SFML](https://www.sfml-dev.org/): Simple and Fast Multimedia Library (>= v3.0.0)
+Almost all desktops environments and especially window managers should have some form of cli tool for switching wallpapers.
+This GUI tool is designed to be desktop agnostic, allowing the user to choose how they switch their wallpaper.
+SWPS uses a configuration file to define its look and the commands for execution.
 
-# Config File
+## Code Dependencies
+- [SFML](https://www.sfml-dev.org/) >= v3.0.0
+
+# Usage
+1. Create a config file using the info below.
+2. Run the program and you should see your wallpapers loaded.
+3. Move with VIM or Arrows Keys.
+4. Press enter to execute wallpaper command.
+
+## Config File
 ```
 swps -c /path/to/config/file.conf
 ```
