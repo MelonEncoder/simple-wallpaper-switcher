@@ -132,6 +132,13 @@ bool isKeyReleased(sf::Keyboard::Key key);
 std::string trim (const std::string& str);
 void parse_config(std::string config_path);
 
+std::string help =
+"Simple Wallpaper Switcher (SWPS)\n"
+"---------- Arguments -----------\n"
+"    -h     : help\n"
+"    -c     : specify config file"
+"";
+
 int main(int argc, char* argv[]) {
     // CLI
     if (argc <= 1) {
@@ -141,7 +148,7 @@ int main(int argc, char* argv[]) {
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg == "-h" || arg == "--help") {
-            std::cout << "Help Comming Soon." << std::endl;
+            std::cout << help << std::endl;
             return 1;
         } else if (arg == "-c") {
             if (i + 1 == argc) {
