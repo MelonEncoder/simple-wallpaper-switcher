@@ -17,6 +17,27 @@
 #include <fstream>
 #include <system_error>
 
+class WP {
+    std::string _path;
+    std::string _filename;
+    sf::Texture _texture;
+
+    public:
+        WP(std::string path) : _path(path) {
+            _filename = _path.substr(_path.find_last_of("/") + 1);
+            _texture = sf::Texture(path);
+        }
+        sf::Texture& getTexture() {
+            return _texture;
+        }
+        std::string getFilename() {
+            return _filename;
+        }
+        std::string getPath() {
+            return _path;
+        }
+};
+
 class WPButton {
     bool isSelected = false;
     float outlineThickness = 0;
@@ -66,8 +87,8 @@ class WPButton {
             shape.setPosition(pos);
         }
         bool getIsSelected() {
-                    return isSelected;
-                }
+            return isSelected;
+        }
         sf::Vector2f getPosition() {
             return shape.getPosition();
         }
@@ -116,8 +137,7 @@ sf::Vector2u window_size = {900, 600};
 sf::Vector2u inner_gaps = {10, 10};
 sf::Vector2u outer_gaps = {25, 25};
 sf::Vector2f thumb_size;
-std::vector<std::string> wp_paths;
-std::vector<sf::Texture> wp_textures;
+std::vector<WP> wallpapers;
 std::vector<std::string> exec_commands;
 std::vector<std::vector<WPButton>> buttons;
 
@@ -170,9 +190,8 @@ int main(int argc, char* argv[]) {
     // Load Wallpapers
     for (const auto &entry : std::filesystem::directory_iterator(wallpaper_directory)) {
         std::string wp_path = entry.path().string();
-        sf::Texture texture(wp_path);
-        wp_paths.push_back(wp_path);
-        wp_textures.push_back(texture);
+        WP wallpaper(wp_path);
+        wallpapers.push_back(wallpaper);
     }
 
     // GUI
@@ -183,21 +202,21 @@ int main(int argc, char* argv[]) {
 
     // Create Wallpaper Buttons
     size_t wp_index = 0;
-    size_t rows = (int)(wp_paths.size() / column_count) + (wp_paths.size() % column_count > 0 ? 1 : 0);
+    size_t rows = (int)(wallpapers.size() / column_count) + (wallpapers.size() % column_count > 0 ? 1 : 0);
     size_t x = outer_gaps.x;
     size_t y = outer_gaps.y;
     for (size_t row = 0; row < rows; row++) {
         std::vector<WPButton> buttonRow = {};
         for (size_t col = 0; col < column_count; col++) {
-            if (wp_index == wp_paths.size()) {
+            if (wp_index == wallpapers.size()) {
                 break;
             }
             sf::RectangleShape shape((sf::Vector2f)thumb_size);
             shape.setOutlineColor(outline_color);
             shape.setOutlineThickness(outline_thickness);
             shape.setPosition({(float)x, (float)y});
-            shape.setTexture(&wp_textures[wp_index]);
-            WPButton button(shape, wp_paths[wp_index], {(int)col, (int)row});
+            shape.setTexture(&wallpapers[wp_index].getTexture());
+            WPButton button(shape, wallpapers[wp_index].getPath(), {(int)col, (int)row});
             buttonRow.push_back(button);
             x += thumb_size.x + inner_gaps.x;
             wp_index++;
@@ -303,7 +322,7 @@ bool isKeyReleased(sf::Keyboard::Key key) {
     return false;
 }
 
-std::string trim (const std::string& str) {
+std::string trim(const std::string& str) {
     size_t first = str.find_first_not_of(" \t\n\r\f\v");
     size_t last = str.find_last_not_of(" \t\n\r\f\v");
     return str.substr(first, last);
