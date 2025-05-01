@@ -11,6 +11,8 @@
 #include <SFML/Window/WindowEnums.hpp>
 #include <SFML/Main.hpp>
 #include <SFML/Graphics.hpp>
+#include <cstdlib>
+#include <ctime>
 #include <string>
 #include <iostream>
 #include <filesystem>
@@ -18,6 +20,7 @@
 #include <system_error>
 
 
+void loadWallpaper(std::string wp_path, std::vector<std::string> commands);
 void parseConfig(const std::string config_path);
 bool isKeyReleased(sf::Keyboard::Key key);
 std::string trim (const std::string str);
@@ -27,115 +30,8 @@ std::string help =
 "Simple Wallpaper Switcher (SWPS)\n"
 "---------- Arguments -----------\n"
 "    -h     : help\n"
-"    -c     : specify config file"
+"    -c     : specify config file\n"
 "";
-
-class WP {
-    std::string _path;
-    std::string _filename;
-    sf::Texture _texture;
-
-    public:
-        WP(std::string path) : _path(path) {
-            _filename = _path.substr(_path.find_last_of("/") + 1);
-            _texture = sf::Texture(path);
-        }
-        sf::Texture& getTexture() {
-            return _texture;
-        }
-        std::string getFilename() {
-            return _filename;
-        }
-        std::string getPath() {
-            return _path;
-        }
-};
-
-class WPButton {
-    bool _is_selected = false;
-    float _outline_thickness = 0;
-    std::string _path;
-    sf::RectangleShape _shape;
-    sf::Vector2i _position;
-    public:
-        static inline sf::Vector2i selected = {0, 0};
-        static inline std::vector<std::string> commands;
-        WPButton(sf::RectangleShape& shape, std::string path, sf::Vector2i position) :
-            _shape(shape) {
-                _path = path;
-                _outline_thickness = shape.getOutlineThickness();
-                _position = position;
-        }
-        void draw(sf::RenderTarget& target, sf::RenderStates states) {
-            target.draw(_shape, states);
-        }
-        void onSelected() {
-            if (WPButton::selected == _position) {
-                _is_selected = true;
-                _shape.setOutlineThickness(_outline_thickness);
-            } else {
-                _is_selected = false;
-                _shape.setOutlineThickness(0);
-            }
-        }
-        void onEnter() {
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter) && _is_selected) {
-                execute();
-            }
-        }
-        void execute() {
-            for (std::string &cmd : commands) {
-                int wp_index = cmd.find("{wp}");
-                cmd.erase(wp_index, 4);
-                cmd.insert(wp_index, _path);
-                int result = std::system(cmd.c_str());
-                if (result != 0) {
-                    std::cerr << "<!> Error running commands." << std::endl;
-                    _shape.setOutlineColor(sf::Color::Red);
-                }
-            }
-            exit(0);
-        }
-        void setPosition(sf::Vector2f pos) {
-            _shape.setPosition(pos);
-        }
-        bool getIsSelected() {
-            return _is_selected;
-        }
-        sf::Vector2f getPosition() {
-            return _shape.getPosition();
-        }
-        sf::Vector2i getGridPosition() {
-            return _position;
-        }
-};
-
-class KeyPlus {
-    sf::Keyboard::Key key;
-    bool key_pressed;
-    bool key_released;
-    bool key_down;
-    public:
-        KeyPlus(sf::Keyboard::Key key) {
-            this->key = key;
-            key_pressed = false;
-            key_released = false;
-            key_down = false;
-        }
-        bool isKeyReleased() {
-            key_pressed = sf::Keyboard::isKeyPressed(key);
-            if (key_released) {
-                key_pressed = false;
-                key_released = false;
-                key_down = false;
-            } else if (key_pressed && !key_released) {
-                key_down = true;
-            } else if (key_down && !key_pressed) {
-                key_released = true;
-            }
-            return key_released;
-        }
-};
 
 class SWPSConf {
     public:
@@ -157,15 +53,17 @@ class SWPSConf {
         // Default values
         outline_color = sf::Color(255, 255, 0);
         background_color = sf::Color(0, 0, 0);
+        thumb_size.x = ((float)window_size.x - (((column_count - 1) * inner_gaps.x) + (outer_gaps.x * 2))) / column_count;
+        thumb_size.y = thumb_size.x * (9.0/16.0);
 
         // Config Values
         parseConfig(config_path);
     }
 
-    void parseConfig(const std::string config_path) {
+    void parseConfig(std::string config_path) {
         std::fstream config_file(config_path, std::ios::in);
         if (!config_file.is_open()) {
-            std::cerr << "<!> Error: Unable to open config file." << std::endl;
+            std::cerr << "<!> SWPSConf::parseConfig(): Unable to open config file." << std::endl;
             exit(1);
         }
         std::vector<std::string> lines;
@@ -183,13 +81,17 @@ class SWPSConf {
                 if (wallpaper_directory.find('~') == 0) {
                     try {
                         wallpaper_directory = getHomeDir() + wallpaper_directory.substr(1);
-                    } catch (std::error_code e) {
-                        std::cerr << "<!> Error: " << e << std::endl;
+                    } catch (std::exception& e) {
+                        std::cerr << "<!> Error: " << e.what() << std::endl;
                         exit(1);
                     }
                 }
                 if (!std::filesystem::is_directory(wallpaper_directory)) {
-                    std::cerr << "<!> wallpaper_directory variable is not valid." << std::endl;
+                    std::cerr << "<!> wallpaper_directory is not valid." << std::endl;
+                    exit(1);
+                }
+                if (!std::filesystem::exists(wallpaper_directory)) {
+                    std::cerr << "<!> Error: Wallpaper directory dos not exists: " << wallpaper_directory << std::endl;
                     exit(1);
                 }
             } else if (var == "window_size") {
@@ -247,14 +149,120 @@ class SWPSConf {
                 scroll_speed = std::stof(value) / 100.0f;
             }
         }
+
         config_file.close();
     }
 };
 
+class WPButton {
+    bool _is_selected = false;
+    float _outline_thickness = 0;
+    std::string _path;
+    std::string _filename;
+    sf::Texture _texture;
+    sf::RectangleShape _shape;
+    sf::Vector2i _grid_position;
+    public:
+        static inline sf::Vector2i selected = {0, 0};
+        static inline std::vector<std::string> commands;
+        WPButton(std::string path, sf::Vector2f position, sf::Vector2i grid_position, SWPSConf conf) {
+            _path = path;
+            _filename = _path.substr(_path.find_last_of("/") + 1);
+            _texture = sf::Texture(path);
+            _outline_thickness = conf.outline_thickness;
+            _grid_position = grid_position;
+
+            _shape = sf::RectangleShape((sf::Vector2f)conf.thumb_size);
+            _shape.setOutlineColor(conf.outline_color);
+            _shape.setOutlineThickness(0);
+            _shape.setPosition(position);
+            _shape.setTexture(&_texture);
+        }
+        void draw(sf::RenderTarget& target, sf::RenderStates states) {
+            target.draw(_shape, states);
+        }
+        void onSelected() {
+            if (WPButton::selected == _grid_position) {
+                _is_selected = true;
+                _shape.setOutlineThickness(_outline_thickness);
+            } else {
+                _is_selected = false;
+                _shape.setOutlineThickness(0);
+            }
+        }
+        void onEnter() {
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Key::Enter) && _is_selected) {
+                execute();
+            }
+        }
+        void execute() {
+            for (size_t i = 0; i < commands.size(); i++) {
+                int wp_index = commands[i].find("{wp}");
+                commands[i].erase(wp_index, 4);
+                commands[i].insert(wp_index, _path);
+                int result = std::system(commands[i].c_str());
+                if (result != 0) {
+                    std::cerr << "<!> Error running command at index " << i << "." << std::endl;
+                }
+            }
+            exit(0);
+        }
+        void setPosition(sf::Vector2f pos) {
+            _shape.setPosition(pos);
+        }
+        bool getIsSelected() {
+            return _is_selected;
+        }
+        sf::Vector2f getPosition() {
+            return _shape.getPosition();
+        }
+        sf::Vector2i getGridPosition() {
+            return _grid_position;
+        }
+        sf::Texture& getTexture() {
+            return _texture;
+        }
+        std::string getFilename() {
+            return _filename;
+        }
+        std::string getPath() {
+            return _path;
+        }
+};
+
+class KeyPlus {
+    sf::Keyboard::Key key;
+    bool key_pressed;
+    bool key_released;
+    bool key_down;
+    public:
+        KeyPlus(sf::Keyboard::Key key) {
+            this->key = key;
+            key_pressed = false;
+            key_released = false;
+            key_down = false;
+        }
+        bool isKeyReleased() {
+            key_pressed = sf::Keyboard::isKeyPressed(key);
+            if (key_released) {
+                key_pressed = false;
+                key_released = false;
+                key_down = false;
+            } else if (key_pressed && !key_released) {
+                key_down = true;
+            } else if (key_down && !key_pressed) {
+                key_released = true;
+            }
+            return key_released;
+        }
+};
+
 int main(int argc, char* argv[]) {
     std::string config_path;
-    std::vector<WP> wallpapers;
+    std::vector<std::string> wallpapers;
     std::vector<std::vector<WPButton>> buttons;
+    std::string cli_wp_path = "";
+    bool set_random_wp = false;
 
     // CLI
     if (argc <= 1) {
@@ -267,21 +275,21 @@ int main(int argc, char* argv[]) {
             std::cout << help << std::endl;
             return 1;
         } else if (arg == "-c" || arg == "--config") {
-            if (i + 1 == argc) {
-                std::cerr << "<!> No path specified after -c" << std::endl;
-                return 1;
-            }
-            arg = argv[++i];
-            if (!std::filesystem::exists(arg)) {
+            i++;
+            if (!std::filesystem::exists(argv[i])) {
                 std::cerr << "<!> Config file dosen't exist." << std::endl;
                 return 1;
             }
-            config_path = arg;
-            i++;
+            config_path = argv[i];
         } else if (arg == "-l" || arg == "--load") {
-            // loads wallpaper from any path
+            i++;
+            if (!std::filesystem::exists(argv[i])) {
+                std::cerr << "<!> Load path does not exists." << std::endl;
+                return 1;
+            }
+            cli_wp_path = argv[i];
         } else if (arg == "-r" || arg == "--random") {
-            // loads a random wallpaper from wallpaper_directory in config file
+            set_random_wp = true;
         } else {
             std::cerr << "<!> Not a valid argument: " << arg << std::endl;
             return 1;
@@ -294,17 +302,25 @@ int main(int argc, char* argv[]) {
 
     SWPSConf conf(config_path);
 
-    WPButton::commands = conf.exec_commands;
+    // Load CLI wallpaper
+    if (cli_wp_path != "") {
+        loadWallpaper(cli_wp_path, conf.exec_commands);
+        exit(0);
+    }
 
-    conf.thumb_size.x = ((float)conf.window_size.x - (((conf.column_count - 1) * conf.inner_gaps.x) + (conf.outer_gaps.x * 2))) / conf.column_count;
-    conf.thumb_size.y = conf.thumb_size.x * (9.0/16.0);
-
-    // Load Wallpapers
+    // Get wallpapers
     for (const auto &entry : std::filesystem::directory_iterator(conf.wallpaper_directory)) {
         std::string wp_path = entry.path().string();
-        WP wallpaper(wp_path);
-        wallpapers.push_back(wallpaper);
+        wallpapers.push_back(wp_path);
     }
+    // Set random wallpaper
+    if (set_random_wp) {
+        srand(time(NULL));
+        loadWallpaper(wallpapers[rand() % (int)wallpapers.size()], conf.exec_commands);
+        exit(0);
+    }
+
+    WPButton::commands = conf.exec_commands;
 
     // GUI
     sf::ContextSettings settings;
@@ -312,7 +328,7 @@ int main(int argc, char* argv[]) {
     sf::RenderWindow window(sf::VideoMode(conf.window_size), "SFML Window", sf::Style::None, sf::State::Windowed, settings);
     window.setPosition(((sf::Vector2i)sf::VideoMode::getDesktopMode().size / 2) - ((sf::Vector2i)conf.window_size / 2));
 
-    // Create Wallpaper Buttons
+    // Create wallpaper buttons
     size_t wp_index = 0;
     size_t rows = (int)(wallpapers.size() / conf.column_count) + (wallpapers.size() % conf.column_count > 0 ? 1 : 0);
     size_t x = conf.outer_gaps.x;
@@ -323,13 +339,11 @@ int main(int argc, char* argv[]) {
             if (wp_index == wallpapers.size()) {
                 break;
             }
-            sf::RectangleShape shape((sf::Vector2f)conf.thumb_size);
-            shape.setOutlineColor(conf.outline_color);
-            shape.setOutlineThickness(conf.outline_thickness);
-            shape.setPosition({(float)x, (float)y});
-            shape.setTexture(&wallpapers[wp_index].getTexture());
-            WPButton button(shape, wallpapers[wp_index].getPath(), {(int)col, (int)row});
+            sf::Vector2f pos = {(float)x, (float)y};
+            sf::Vector2i grid_pos = {(int)col, (int)row};
+            WPButton button(wallpapers[wp_index], pos, grid_pos, conf);
             button_row.push_back(button);
+
             x += conf.thumb_size.x + conf.inner_gaps.x;
             wp_index++;
         }
@@ -353,7 +367,7 @@ int main(int argc, char* argv[]) {
     KeyPlus left_key(sf::Keyboard::Key::Left);
     KeyPlus right_key(sf::Keyboard::Key::Right);
 
-    // App Loop
+    // App loop
     while (window.isOpen()) {
         window.clear();
         while (const std::optional event = window.pollEvent()) {
@@ -385,7 +399,7 @@ int main(int argc, char* argv[]) {
             }
         }
 
-        // Scroll Functionality
+        // Scroll functionality when too many wallpapers
         WPButton tmpBtn = buttons[WPButton::selected.y][WPButton::selected.x];
         if (tmpBtn.getPosition().y + conf.thumb_size.y > conf.window_size.y) {
             for (size_t row = 0; row < buttons.size(); row++) {
@@ -443,7 +457,19 @@ std::string trim(const std::string str) {
 std::string getHomeDir() {
     char * home = std::getenv("HOME");
     if (!home) {
-        throw std::runtime_error("Failed to get home directory");
+        throw std::runtime_error("Failed to get home directory: HOME environment variable not set");
     }
     return std::string(home);
+}
+
+void loadWallpaper(std::string wp_path, std::vector<std::string> commands) {
+    for (size_t i = 0; i < commands.size(); i++) {
+        int wp_index = commands[i].find("{wp}");
+        commands[i].erase(wp_index, 4);
+        commands[i].insert(wp_index, wp_path);
+        int result = std::system(commands[i].c_str());
+        if (result != 0) {
+            std::cerr << "<!> Error running command at index " << i << "." << std::endl;
+        }
+    }
 }
