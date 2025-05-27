@@ -28,9 +28,10 @@ std::string getHomeDir();
 
 std::string help =
 "Simple Wallpaper Switcher (SWPS)\n"
-"---------- Arguments -----------\n"
 "    -h     : help\n"
 "    -c     : specify config file\n"
+"    -r     : set random wallpaper\n"
+"    -s     : set wallpaper to path\n"
 "";
 
 class SWPSConf {
@@ -63,7 +64,7 @@ class SWPSConf {
     void parseConfig(std::string config_path) {
         std::fstream config_file(config_path, std::ios::in);
         if (!config_file.is_open()) {
-            std::cerr << "<!> SWPSConf::parseConfig(): Unable to open config file." << std::endl;
+            std::cerr << "<!> Unable to open config file." << std::endl;
             exit(1);
         }
         std::vector<std::string> lines;
@@ -73,6 +74,10 @@ class SWPSConf {
         }
         for (size_t i = 0; i < lines.size(); i++) {
             std::string line = lines[i];
+            // skips blank lines
+            if (line.find_first_not_of(" \t\n\r\f\v")) {
+                continue;
+            }
             std::string var = line.substr(0, line.find_first_of(' '));
             std::string value = line.substr(line.find_first_of('=') + 1);
             value = trim(value);
@@ -87,11 +92,11 @@ class SWPSConf {
                     }
                 }
                 if (!std::filesystem::is_directory(wallpaper_directory)) {
-                    std::cerr << "<!> wallpaper_directory is not valid." << std::endl;
+                    std::cerr << "<!> Wallpaper_directory is not valid." << std::endl;
                     exit(1);
                 }
                 if (!std::filesystem::exists(wallpaper_directory)) {
-                    std::cerr << "<!> Error: Wallpaper directory dos not exists: " << wallpaper_directory << std::endl;
+                    std::cerr << "<!> Wallpaper directory dos not exists: " << wallpaper_directory << std::endl;
                     exit(1);
                 }
             } else if (var == "window_size") {
@@ -261,59 +266,70 @@ int main(int argc, char* argv[]) {
     std::string config_path;
     std::vector<std::string> wallpapers;
     std::vector<std::vector<WPButton>> buttons;
-    std::string cli_wp_path = "";
+    std::string set_wp_path = "";
     bool set_random_wp = false;
 
     // CLI
     if (argc <= 1) {
         std::cout << "<!> Not enough arguments." << std::endl;
-        return 1;
+        exit(1);
     }
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg == "-h" || arg == "--help") {
             std::cout << help << std::endl;
-            return 1;
+            exit(1);
         } else if (arg == "-c" || arg == "--config") {
-            i++;
-            if (!std::filesystem::exists(argv[i])) {
-                std::cerr << "<!> Config file dosen't exist." << std::endl;
-                return 1;
+            if (!argv[i+1]) {
+                std::cerr << "<!> Config path not specified." << std::endl;
+                exit(1);
             }
-            config_path = argv[i];
-        } else if (arg == "-l" || arg == "--load") {
-            i++;
-            if (!std::filesystem::exists(argv[i])) {
-                std::cerr << "<!> Load path does not exists." << std::endl;
-                return 1;
+            arg = argv[++i];
+            if (!std::filesystem::exists(arg)) {
+                std::cerr << "<!> Config path dosen't exist: " << arg << std::endl;
+                exit(1);
             }
-            cli_wp_path = argv[i];
+            config_path = arg;
+        } else if (arg == "-s" || arg == "--set") {
+            if (!argv[i+1]) {
+                std::cerr << "<!> Wallpaper path not specified." << std::endl;
+                exit(1);
+            }
+            arg = argv[++i];
+            if (!std::filesystem::exists(arg)) {
+                std::cerr << "<!> Wallpaper path does not exists: " << arg << std::endl;
+                exit(1);
+            }
+            set_wp_path = arg;
         } else if (arg == "-r" || arg == "--random") {
             set_random_wp = true;
         } else {
             std::cerr << "<!> Not a valid argument: " << arg << std::endl;
-            return 1;
+            exit(1);
         }
     }
+
     if (config_path == "") {
-        std::cerr << "<!> Config path not specified." << std::endl;
-        return 1;
+        std::cerr << "<!> Config file not found. Use -c to specify path" << std::endl;
+        exit(1);
     }
 
     SWPSConf conf(config_path);
 
-    // Load CLI wallpaper
-    if (cli_wp_path != "") {
-        loadWallpaper(cli_wp_path, conf.exec_commands);
+    // set wallpaper via path
+    if (set_wp_path != "") {
+        loadWallpaper(set_wp_path, conf.exec_commands);
+        if (set_random_wp) {
+            std::cout << "<#> -s overrides -r so no random wallpaper." << std::endl;
+        }
         exit(0);
     }
-
-    // Get wallpapers
+    // load wallpapers
     for (const auto &entry : std::filesystem::directory_iterator(conf.wallpaper_directory)) {
         std::string wp_path = entry.path().string();
         wallpapers.push_back(wp_path);
     }
-    // Set random wallpaper
+    // set random wallpaper
     if (set_random_wp) {
         srand(time(NULL));
         loadWallpaper(wallpapers[rand() % (int)wallpapers.size()], conf.exec_commands);

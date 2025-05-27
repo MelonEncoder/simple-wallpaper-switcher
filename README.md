@@ -18,7 +18,7 @@ swps -c /path/to/config/file.conf
 ```
 | VARIABLE    | DESCRIPTION | TYPE | DEFAULT |
 |---------|-------------|------|---------|
-| wallpaper_directory | The path to the wallpaper directory. | string | |
+| wallpaper_directory | The path to the wallpaper directory. | string | "" |
 | window_size | Size of the window. | int, int | 800, 600 |
 | exec | An array of commands to execute. Use {wp} to represent the wallpaper path. (put each command on new line if multiple) | string[] | [] |
 | column_count | Number of columns to display. | int | 3 |
